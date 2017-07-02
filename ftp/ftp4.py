@@ -58,7 +58,7 @@ class FTPSync(object):
         t = local_dir.decode('utf-8')
         print t
         os.chdir(t)
-
+        #切换目录
         ftp_curr_dir = self.ftp.pwd()
         local_curr_dir = os.getcwd()
 
@@ -69,16 +69,31 @@ class FTPSync(object):
         for f in files:
             print local_curr_dir,'正在保存',next_dir, '目录下的:', f
             outf = open(f.decode('utf-8'), 'wb')
-            try:
-                self.ftp.retrbinary('RETR %s' % f, outf.write)
-            finally:
-                outf.close()
+            for i in range(3):
+                try:
+                    self.ftp.retrbinary('RETR %s' % f, outf.write)
+                    break;
+                except IOError,e:
+                    print '--------------------------------出错了：'+str(e)
+                    FTPError.append((ser["name"],str(e)+f+'下载出错'+str(i)))
+                    time.sleep(3)
+                    continue;
+                finally:
+                    outf.close()
         for d in dirs:
-            print '切换目录至：',local_curr_dir
-            os.chdir(local_curr_dir)
-            self.ftp.cwd(ftp_curr_dir)
-            #递归调用遍历每一层目录.
-            self.walk(d)
+            for i in range(3):
+                print '切换目录至：',local_curr_dir
+                os.chdir(local_curr_dir)
+                try:
+                    self.ftp.cwd(ftp_curr_dir)
+                    #递归调用遍历每一层目录.
+                    self.walk(d)
+                    break;
+                except IOError,e:
+                    print '--------------------------------出错了：'+str(e)
+                    FTPError.append((ser["name"],str(e)+f+'下载出错'+str(i)))
+                    time.sleep(3)
+                    continue
     def run(self):
         self.walk(self.remotedir,self.rootdir_local)
         #self.walk('.')
@@ -104,8 +119,8 @@ if __name__ == '__main__':
     print '''
              *************************************
              **       Welcome to use XPftp     **
-             **      Created on  2017-06-18     **
-             **       @author: peeperp            **
+             **      Created on  2017-06-18    **
+             **       @author: peeperp         **
              *************************************
           '''
     #time.sleep(2000)
@@ -120,6 +135,7 @@ if __name__ == '__main__':
         local_file_list_txt = 'E:/temp/12/fileList.txt'  # 配置文件
         local_files = []
         get_serverlist()
+        FTPError=[('SerName','ErrorDepict')]
         print '本次备份服务器列表', local_files
         for ser in local_files:
             ser = eval(ser)
@@ -128,16 +144,17 @@ if __name__ == '__main__':
             username = ser["username"]  # 用户名
             password = ser["password"]  # 密码
             port = ser["port"]  # 端口号
-            rootdir_local = ser["localdir"]  # 本地目录
+            rootdir_local = ser["localdir"]+ datenow+"/"# 本地目录
             rootdir_remote = ser["remotedir"]  # 远程目录
             main(rootdir_local, hostaddr, username, password, rootdir_remote, port)
         timenow = time.localtime()
         datenow = time.strftime('%Y-%m-%d', timenow)
         logstr += " - %s 成功执行了备份\n" % datenow
-        debug_print(logstr)
+        #debug_print(logstr)
 
         file.write(logstr)
         file.close()
+        print FTPError
     elif chioes == '2':
         print 'Function is under development!'
     else:
